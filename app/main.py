@@ -19,7 +19,9 @@ from app import config  # noqa: E402
 from app.ai.gemini import generate_json, generate_text  # noqa: E402
 from app.domain.advice import ai_summary, facts_from_history, recommend  # noqa: E402
 from app.domain.aging import aging_report, total_overdue  # noqa: E402
+from app.domain.money import rupees  # noqa: E402
 from app.domain.ranking import rank_customers  # noqa: E402
+from app.ingestion.cleaning import apply_cleaning, suggest_merge  # noqa: E402
 from app.ingestion.loader import COLUMN_ALIASES, REQUIRED, invoices_from_frame, read_ledger_table  # noqa: E402
 from app.ingestion.quality import find_suspicious  # noqa: E402
 from app.ingestion.smart_mapping import resolve_mapping  # noqa: E402
@@ -163,21 +165,45 @@ if not result.invoices:
     st.warning("No valid invoices were found in this file. Check the column mapping above.")
     st.stop()
 
-# ---- 2. data checks ---------------------------------------------------------------
+# ---- 2. data checks: the shopkeeper decides what to skip or merge -----------------
 flags = find_suspicious(result.invoices, as_of)
+skip_rows: set[int] = set()
+merges: dict[str, str] = {}
 if flags:
     with st.expander(f"🔍 {len(flags)} thing(s) worth a look in your data"):
-        for fl in flags:
+        st.caption("Tick a box to leave a row out of the totals, or to merge two names. "
+                   "Your file is never changed, and unticking puts everything back.")
+        boxed_rows: set[int] = set()
+        for n, fl in enumerate(flags):
+            if fl.kind == "names":
+                keep, drop = suggest_merge(result.invoices, fl.customer, fl.other)
+                st.write(f"- {fl.message}")
+                if st.checkbox(f"Merge '{drop}' into '{keep}'", key=f"merge_{filename}_{n}"):
+                    merges[drop] = keep
+                continue
             where = f"Row {fl.row_number}: " if fl.row_number else ""
             st.write(f"- {where}**{fl.customer}**. {fl.message}")
+            if fl.row_number is not None and fl.row_number not in boxed_rows:
+                boxed_rows.add(fl.row_number)
+                if st.checkbox(f"Leave row {fl.row_number} out of the totals",
+                               key=f"skip_{filename}_{fl.row_number}"):
+                    skip_rows.add(fl.row_number)
 
-report = aging_report(result.invoices, as_of)
+invoices = apply_cleaning(result.invoices, skip_rows, merges)
+if skip_rows or merges:
+    st.info(f"Totals below leave out {len(skip_rows)} row(s) and merge {len(merges)} name(s), "
+            "as you chose above.")
+if not invoices:
+    st.warning("Every row has been left out. Untick some boxes above.")
+    st.stop()
+
+report = aging_report(invoices, as_of)
 ranked = rank_customers(report)
 
 c1, c2, c3 = st.columns(3)
-c1.metric("Total overdue", f"₹{total_overdue(result.invoices, as_of):,.0f}")
+c1.metric("Total overdue", rupees(total_overdue(invoices, as_of)))
 c2.metric("Customers to chase", len(ranked))
-c3.metric("Invoices loaded", len(result.invoices))
+c3.metric("Invoices counted", len(invoices))
 
 st.subheader("Chase these customers first")
 st.dataframe(
@@ -195,7 +221,7 @@ st.subheader("Reminder draft")
 if ranked.empty:
     st.success("Nothing overdue. No reminders needed.")
 else:
-    phones = phone_lookup(result.invoices)
+    phones = phone_lookup(invoices)
     flash = st.session_state.pop("_flash", None)
     if flash:
         st.success(flash)
@@ -228,7 +254,7 @@ else:
         pick, shop, float(row["overdue_amount"]), int(row["max_days_overdue"]),
         tone, language, use_ai,
     )
-    st.caption(f"Overdue ₹{row['overdue_amount']:,.0f} · oldest {int(row['max_days_overdue'])} days"
+    st.caption(f"Overdue {rupees(row['overdue_amount'])} · oldest {int(row['max_days_overdue'])} days"
                f" · draft source: {'AI (checked)' if src == 'ai' else 'standard template'}")
     if note:
         st.warning(note)
@@ -278,7 +304,7 @@ else:
             if a.summary:
                 st.caption(a.summary)
             if a.amount or a.promised_date:
-                amt = f"₹{a.amount:,.0f}" if a.amount else "not stated"
+                amt = rupees(a.amount) if a.amount else "not stated"
                 when = f"{a.promised_date:%d %b %Y}" if a.promised_date else "not stated"
                 st.write(f"Amount: {amt} · Date: {when}")
             for w in a.warnings:
@@ -302,9 +328,9 @@ stats = repo.summary(DB)
 r1, r2, r3, r4 = st.columns(4)
 r1.metric("Reminders sent", stats["reminders_sent"])
 r2.metric("Promises pending", stats["promises_pending"],
-          f"₹{stats['promises_pending_amount']:,.0f}", delta_color="off")
+          rupees(stats["promises_pending_amount"]), delta_color="off")
 r3.metric("Promises kept", stats["promises_kept"])
-r4.metric("Money recovered", f"₹{stats['recovered_total']:,.0f}")
+r4.metric("Money recovered", rupees(stats["recovered_total"]))
 
 with st.expander("Record money received"):
     names = list(ranked["customer"]) if not ranked.empty else []
@@ -330,7 +356,7 @@ if pending:
         due = date.fromisoformat(p["promised_date"])
         late = " ⚠️ date passed" if due < date.today() else ""
         a, b, c = st.columns([5, 1, 1])
-        a.write(f"{p['customer']} · ₹{p['amount']:,.0f} by {due:%d %b %Y}{late}")
+        a.write(f"{p['customer']} · {rupees(p['amount'])} by {due:%d %b %Y}{late}")
         if b.button("Kept", key=f"kept_{p['id']}"):
             repo.set_promise_status(DB, p["id"], "kept")
             st.rerun()

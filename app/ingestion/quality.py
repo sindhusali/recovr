@@ -10,6 +10,7 @@ from datetime import date
 from difflib import SequenceMatcher
 
 from app.domain.models import Invoice
+from app.domain.money import rupees
 
 MAX_NAMES_COMPARED = 400
 
@@ -19,6 +20,8 @@ class Flag:
     row_number: int | None
     customer: str
     message: str
+    kind: str = "row"   # "row" (can be skipped) or "names" (can be merged)
+    other: str = ""     # the second name, for kind == "names"
 
 
 def _key(name: str) -> str:
@@ -46,7 +49,7 @@ def find_suspicious(invoices: list[Invoice], as_of: date) -> list[Flag]:
             flags.append(Flag(inv.row_number, inv.customer, "Amount is zero."))
         if inv.paid_amount > inv.amount:
             flags.append(Flag(inv.row_number, inv.customer,
-                              f"Paid (₹{inv.paid_amount:,.0f}) is more than the bill (₹{inv.amount:,.0f})."))
+                              f"Paid ({rupees(inv.paid_amount)}) is more than the bill ({rupees(inv.amount)})."))
         if inv.invoice_date and inv.due_date < inv.invoice_date:
             flags.append(Flag(inv.row_number, inv.customer, "Due date is before the bill date."))
         age = (as_of - inv.due_date).days
@@ -64,7 +67,7 @@ def find_suspicious(invoices: list[Invoice], as_of: date) -> list[Flag]:
         for inv in invoices:
             if median > 0 and float(inv.amount) > 20 * median:
                 flags.append(Flag(inv.row_number, inv.customer,
-                                  f"Amount ₹{inv.amount:,.0f} is over 20x the usual bill (₹{median:,.0f}). "
+                                  f"Amount {rupees(inv.amount)} is over 20x the usual bill ({rupees(median)}). "
                                   "Extra zero?"))
 
     # 4. near-identical customer names
@@ -72,7 +75,7 @@ def find_suspicious(invoices: list[Invoice], as_of: date) -> list[Flag]:
     for i, a in enumerate(names):
         for b in names[i + 1:]:
             if _key(a) == _key(b) or SequenceMatcher(None, _key(a), _key(b)).ratio() >= 0.9:
-                flags.append(Flag(None, a, f"'{a}' and '{b}' may be the same customer."))
+                flags.append(Flag(None, a, f"'{a}' and '{b}' may be the same customer.", "names", b))
 
     flags.sort(key=lambda f: (f.row_number is None, f.row_number or 0))
     return flags

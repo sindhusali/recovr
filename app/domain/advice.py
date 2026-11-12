@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 
+from app.domain.money import rupees
 from app.domain.ranking import suggested_tone
 
 TextAI = Callable[[str], "str | None"]
@@ -73,7 +74,7 @@ def recommend(f: CustomerFacts, today: date) -> Action:
 
     # 1. a promise is still in the future: do not nag
     if f.pending_promise_date and f.pending_promise_date >= today:
-        amt = f" ₹{f.pending_promise_amount:,.0f}" if f.pending_promise_amount else ""
+        amt = f" {rupees(f.pending_promise_amount)}" if f.pending_promise_amount else ""
         return Action("wait", f"Wait until {f.pending_promise_date:%d %b}", None, [
             f"Customer promised{amt} by {f.pending_promise_date:%d %b %Y}.",
             "Messaging again before then can annoy a customer who has made a commitment."])
@@ -105,7 +106,7 @@ def recommend(f: CustomerFacts, today: date) -> Action:
 
     # 6. default: message, tone from age and history
     tone = _bump(base, 1) if f.promises_broken >= 1 else base
-    reasons = [f"₹{f.overdue_amount:,.0f} is overdue, oldest bill {f.days_overdue} days."]
+    reasons = [f"{rupees(f.overdue_amount)} is overdue, oldest bill {f.days_overdue} days."]
     if f.promises_broken >= 1:
         reasons.append("A previous promise was broken, so the tone is one step firmer.")
     return Action("message", f"Send a {tone} reminder", tone, reasons + history_bits)
