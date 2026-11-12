@@ -3,6 +3,6 @@ pandas
 openpyxl
 pydantic
 python-dotenv
-google-generativeai
+google-genai
 pytest
 ruff
