@@ -1,7 +1,11 @@
 import pytest
 
 from app.messaging.templates import (
-    LANGUAGES, TEMPLATES, TONES, format_inr, render_template,
+    LANGUAGES,
+    TEMPLATES,
+    TONES,
+    format_inr,
+    render_template,
 )
 
 

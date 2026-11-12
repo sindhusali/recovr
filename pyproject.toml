@@ -1,0 +1,22 @@
+[project]
+name = "recovr"
+version = "0.1.0"
+description = "AI-assisted overdue-payment follow-up for small shops and distributors"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]  # long lines are fine for readable strings and messages
+
+[tool.ruff.lint.per-file-ignores]
+"app/main.py" = ["E402"]
+"scripts/*.py" = ["E402"]

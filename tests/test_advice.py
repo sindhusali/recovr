@@ -1,8 +1,11 @@
-from datetime import date, datetime, timedelta
+from datetime import date
 from decimal import Decimal
 
 from app.domain.advice import (
-    CustomerFacts, ai_summary, facts_from_history, recommend,
+    CustomerFacts,
+    ai_summary,
+    facts_from_history,
+    recommend,
 )
 from app.storage import repo
 

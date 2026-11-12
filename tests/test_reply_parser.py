@@ -2,7 +2,10 @@ from datetime import date
 from decimal import Decimal
 
 from app.messaging.reply_parser import (
-    build_prompt, parse_reply, parse_reply_rules, validate_ai_reply,
+    build_prompt,
+    parse_reply,
+    parse_reply_rules,
+    validate_ai_reply,
 )
 
 TODAY = date(2026, 11, 4)  # a Wednesday

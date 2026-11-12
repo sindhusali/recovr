@@ -2,7 +2,11 @@ from datetime import date
 from decimal import Decimal
 
 from app.domain.aging import (
-    aging_report, bucket_for, days_overdue, invoices_to_frame, total_overdue,
+    aging_report,
+    bucket_for,
+    days_overdue,
+    invoices_to_frame,
+    total_overdue,
 )
 from app.domain.models import Invoice
 

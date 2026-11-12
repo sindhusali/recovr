@@ -1,0 +1,23 @@
+[server]
+enableStaticServing = true      # serves the bundled font and logo from app/static
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#1F4E9E"
+backgroundColor = "#F7F9FC"
+secondaryBackgroundColor = "#EDF2F9"
+textColor = "#16213A"
+borderColor = "#D3DCEA"
+baseRadius = "6px"
+buttonRadius = "6px"
+showWidgetBorder = true
+
+[theme.sidebar]
+backgroundColor = "#16213A"
+secondaryBackgroundColor = "#22304F"
+textColor = "#E8EDF7"
+borderColor = "#33456B"
+primaryColor = "#7FA8E8"

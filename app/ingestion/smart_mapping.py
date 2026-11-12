@@ -19,7 +19,12 @@ from decimal import Decimal, InvalidOperation
 import pandas as pd
 
 from app.ingestion.loader import (
-    _ISO_DATE, _NUM_DATE, COLUMN_ALIASES, REQUIRED, _is_blank, map_columns,
+    _ISO_DATE,
+    _NUM_DATE,
+    COLUMN_ALIASES,
+    REQUIRED,
+    _is_blank,
+    map_columns,
 )
 
 FIELD_DESCRIPTIONS = {

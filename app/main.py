@@ -22,7 +22,12 @@ from app.domain.aging import aging_report, total_overdue  # noqa: E402
 from app.domain.money import rupees  # noqa: E402
 from app.domain.ranking import rank_customers  # noqa: E402
 from app.ingestion.cleaning import apply_cleaning, suggest_merge  # noqa: E402
-from app.ingestion.loader import COLUMN_ALIASES, REQUIRED, invoices_from_frame, read_ledger_table  # noqa: E402
+from app.ingestion.loader import (  # noqa: E402
+    COLUMN_ALIASES,
+    REQUIRED,
+    invoices_from_frame,
+    read_ledger_table,
+)
 from app.ingestion.quality import find_suspicious  # noqa: E402
 from app.ingestion.smart_mapping import resolve_mapping  # noqa: E402
 from app.messaging.builder import build_message  # noqa: E402
@@ -31,6 +36,7 @@ from app.messaging.reply_parser import parse_reply  # noqa: E402
 from app.messaging.templates import LANGUAGES, TONES  # noqa: E402
 from app.messaging.whatsapp import phone_lookup, whatsapp_url  # noqa: E402
 from app.storage import repo  # noqa: E402
+from app.ui import KIND_STYLE, LOGO_PATH, inject_style, kind_marker, render_header  # noqa: E402
 
 SAMPLE = ROOT / "data" / "sample_ledger.csv"
 DB = config.DB_PATH
@@ -40,7 +46,6 @@ FIELD_LABELS = {
     "invoice_date": "Bill date", "invoice_no": "Bill number",
     "paid_amount": "Paid / received", "phone": "Phone number",
 }
-ACTION_ICONS = {"wait": "⏳", "message": "✉️", "call": "📞", "escalate": "🚨"}
 INTENT_HINTS = {
     "promise_to_pay": "The promise is copied into the form below. Check it, then press Save promise.",
     "already_paid": "Check your cash or bank first. If it arrived, record it under Record money received.",
@@ -77,17 +82,17 @@ def make_draft(customer, shop, amount, days, tone, language, use_ai):
     return draft.text, draft.source, draft.note
 
 
-st.set_page_config(page_title="recovr", page_icon="💰", layout="wide")
-st.title("recovr")
-st.caption("See who owes you money, and who to chase first.")
+st.set_page_config(page_title="recovr", page_icon=str(LOGO_PATH), layout="wide")
+inject_style()
+render_header()
 
 with st.sidebar:
-    st.header("Ledger")
+    st.header(":material/table_chart: Ledger")
     uploaded = st.file_uploader("Upload CSV or Excel", type=["csv", "xlsx", "xls"])
     use_sample = st.checkbox("Use fake sample data", value=uploaded is None,
                              disabled=uploaded is not None)
     as_of = st.date_input("Calculate as of", value=date.today())
-    st.header("Messages")
+    st.header(":material/chat: Messages")
     shop = st.text_input("Your shop name", value=config.DEFAULT_SHOP_NAME)
     language = st.selectbox("Language", list(LANGUAGES), format_func=LANGUAGES.get)
     use_ai = st.checkbox(
@@ -124,7 +129,7 @@ except Exception as exc:  # unreadable or empty file
 headers = [str(c) for c in df.columns]
 by_ai = [f for f, s in suggestion.source.items() if s == "ai"]
 needs_confirm = bool(suggestion.missing_required) or bool(by_ai)
-with st.expander("Column mapping" + (" ⚠️ please check" if needs_confirm else " ✓"),
+with st.expander("Column mapping" + (" (please check)" if needs_confirm else " (ok)"),
                  expanded=needs_confirm):
     if suggestion.missing_required:
         st.warning("I could not match every required column automatically. "
@@ -135,7 +140,7 @@ with st.expander("Column mapping" + (" ⚠️ please check" if needs_confirm els
                 + ". Please check these against the preview before trusting the numbers.")
     mapping: dict[str, str] = {}
     cols = st.columns(len(COLUMN_ALIASES))
-    for col, fld in zip(cols, COLUMN_ALIASES):
+    for col, fld in zip(cols, COLUMN_ALIASES, strict=True):
         options = [NONE] + headers
         current = suggestion.mapping.get(fld, NONE)
         choice = col.selectbox(FIELD_LABELS[fld] + (" *" if fld in REQUIRED else ""), options,
@@ -170,7 +175,7 @@ flags = find_suspicious(result.invoices, as_of)
 skip_rows: set[int] = set()
 merges: dict[str, str] = {}
 if flags:
-    with st.expander(f"🔍 {len(flags)} thing(s) worth a look in your data"):
+    with st.expander(f":material/search: {len(flags)} thing(s) worth a look in your data"):
         st.caption("Tick a box to leave a row out of the totals, or to merge two names. "
                    "Your file is never changed, and unticking puts everything back.")
         boxed_rows: set[int] = set()
@@ -236,7 +241,8 @@ else:
         overdue_amount=outstanding, today=as_of)
     action = recommend(facts, as_of)
     with st.container(border=True):
-        st.markdown(f"**{ACTION_ICONS[action.kind]} Suggested next step: {action.headline}**")
+        st.markdown(kind_marker(action.kind), unsafe_allow_html=True)
+        st.markdown(f"**:material/{KIND_STYLE[action.kind][0]}: Suggested next step: {action.headline}**")
         for reason in action.reasons:
             st.write(f"- {reason}")
         if use_ai:
@@ -265,7 +271,7 @@ else:
     if pick not in phones:
         st.caption("No phone number found for this customer. WhatsApp will ask you to pick a contact.")
 
-    if st.button("✅ I sent this message", key="sent_btn"):
+    if st.button("I sent this message", key="sent_btn", icon=":material/check_circle:"):
         rid = repo.record_reminder(
             DB, customer=pick, phone=phones.get(pick), language=language, tone=tone,
             source=src, amount=outstanding,
@@ -354,7 +360,7 @@ if pending:
     st.markdown("**Pending promises**")
     for p in pending[:20]:
         due = date.fromisoformat(p["promised_date"])
-        late = " ⚠️ date passed" if due < date.today() else ""
+        late = " (date passed)" if due < date.today() else ""
         a, b, c = st.columns([5, 1, 1])
         a.write(f"{p['customer']} · {rupees(p['amount'])} by {due:%d %b %Y}{late}")
         if b.button("Kept", key=f"kept_{p['id']}"):
@@ -377,7 +383,7 @@ st.subheader("Aging by customer")
 st.dataframe(report, hide_index=True, width="stretch")
 
 if result.issues:
-    with st.expander(f"⚠️ {len(result.issues)} row(s) skipped"):
+    with st.expander(f":material/warning: {len(result.issues)} row(s) skipped"):
         for issue in result.issues:
             st.write(f"Row {issue.row_number}: {issue.reason}")
 if result.unmapped_columns:

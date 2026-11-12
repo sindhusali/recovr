@@ -251,7 +251,7 @@ def invoices_from_frame(df: pd.DataFrame, mapping: dict[str, str] | None = None)
     result = LoadResult(unmapped_columns=unmapped)
     for idx, row in df.iterrows():
         row_number = int(idx) + 1  # index is the 0-based sheet row; sheet rows start at 1
-        get = lambda f: row[mapping[f]] if f in mapping else None  # noqa: E731
+        get = lambda f, row=row: row[mapping[f]] if f in mapping else None  # noqa: E731
         try:
             invoice = Invoice(
                 customer=_to_text(get("customer")),

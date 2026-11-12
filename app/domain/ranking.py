@@ -40,7 +40,7 @@ def rank_customers(report: pd.DataFrame) -> pd.DataFrame:
 
     df["tone"] = df["max_days_overdue"].map(suggested_tone)
     df["priority_score"] = [
-        priority_score(a, d) for a, d in zip(df["overdue_amount"], df["max_days_overdue"])
+               priority_score(a, d) for a, d in zip(df["overdue_amount"], df["max_days_overdue"], strict=True)
     ]
     df = df.sort_values(["priority_score", "customer"], ascending=[False, True])
     df.insert(0, "rank", range(1, len(df) + 1))

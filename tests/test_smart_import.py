@@ -4,10 +4,15 @@ from datetime import date
 import pandas as pd
 
 from app.ingestion.loader import (
-    infer_dayfirst, invoices_from_frame, load_invoices, read_ledger_table,
+    infer_dayfirst,
+    invoices_from_frame,
+    load_invoices,
+    read_ledger_table,
 )
 from app.ingestion.smart_mapping import (
-    profile_column, resolve_mapping, validate_ai_mapping,
+    profile_column,
+    resolve_mapping,
+    validate_ai_mapping,
 )
 
 
