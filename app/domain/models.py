@@ -15,6 +15,7 @@ class Invoice(BaseModel):
     invoice_date: date | None = None
     paid_amount: Decimal = Field(default=Decimal("0"), ge=0)
     phone: str = ""
+    row_number: int | None = None  # row in the source sheet (header row = 1)
 
     @field_validator("customer")
     @classmethod

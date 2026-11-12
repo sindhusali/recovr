@@ -118,6 +118,53 @@ def add_recovery(db_path, *, customer: str, amount, received_date: date,
         conn.close()
 
 
+def customer_history(db_path, customer: str) -> dict:
+    """Everything we know about one customer, for the next-action advice."""
+    conn = connect(db_path)
+    try:
+        r = conn.execute(
+            "SELECT COUNT(*) n, MAX(created_at) last FROM reminders WHERE customer = ?",
+            (customer,)).fetchone()
+        counts = {"pending": 0, "kept": 0, "broken": 0}
+        for row in conn.execute(
+                "SELECT status, COUNT(*) n FROM promises WHERE customer = ? GROUP BY status",
+                (customer,)):
+            counts[row["status"]] = row["n"]
+        pending = conn.execute(
+            "SELECT promised_date, amount_paise FROM promises WHERE customer = ? "
+            "AND status = 'pending' ORDER BY promised_date DESC, id DESC LIMIT 1",
+            (customer,)).fetchone()
+        paid = conn.execute(
+            "SELECT COUNT(*) n FROM recoveries WHERE customer = ?", (customer,)).fetchone()
+        return {
+            "reminders_sent": r["n"],
+            "last_reminder_at": r["last"],
+            "promises_kept": counts["kept"],
+            "promises_broken": counts["broken"],
+            "pending_promise": (
+                {"promised_date": pending["promised_date"],
+                 "amount": from_paise(pending["amount_paise"])} if pending else None),
+            "payments_received": paid["n"],
+        }
+    finally:
+        conn.close()
+
+
+def log_reply_read(db_path, *, customer: str, intent: str, source: str,
+                   amount, promised_date) -> None:
+    """Audit that a reply was read. The reply text itself is NOT stored (privacy)."""
+    conn = connect(db_path)
+    try:
+        with conn:
+            audit.log_event(conn, "reply_read", customer, {
+                "intent": intent, "read_by": source,
+                "amount": str(amount) if amount is not None else None,
+                "promised_date": promised_date.isoformat() if promised_date else None,
+            })
+    finally:
+        conn.close()
+
+
 def summary(db_path) -> dict:
     """Headline numbers for the results dashboard."""
     conn = connect(db_path)
